@@ -13,7 +13,7 @@ install step.
 |---|---|
 | Interaction | Drag to orbit · wheel / **two-finger pinch** to zoom · three display modes (shaded / clay / x-ray) · explode and reset · callout toggle · paper and dark field · four camera presets |
 | Output | One HTML file with three.js, CSS and JS inlined (780 KB, 205 KB gzipped) |
-| Requirements | Node ≥ 18 to build; the output itself has zero runtime dependencies |
+| Requirements | To view: nothing — open the HTML. To build: Node ≥ 18. The output itself has zero runtime dependencies |
 | Engine | three.js r186 (MIT) |
 
 | Clay | X-ray |
@@ -25,6 +25,18 @@ install step.
 | ![explode](qa/states/final-explode.jpg) | ![dark](qa/states/final-dark.jpg) |
 
 ## Run it in 30 seconds
+
+**To just look at it** — no install, no build, no server:
+
+```bash
+open examples/sample/dossier.html
+```
+
+The artifact is one self-contained HTML file: three.js, the styles and the
+application code are all inlined. Copy that one file anywhere and it still works,
+including straight off a `file://` path.
+
+**To change the code** — this needs Node ≥ 18:
 
 ```bash
 npm install
@@ -41,6 +53,9 @@ npm run build:debug    # unminified + inline sourcemap, for readable stack trace
 
 `npm run dev` and `npm run build:debug` write to `examples/sample/dossier.dev.html`,
 which is gitignored — they never overwrite the committed artifact.
+
+A fresh build reproduces the committed artifact byte for byte, so a clone that has
+not been built yet is already usable.
 
 ## Swap in your own product
 
@@ -96,10 +111,20 @@ large image.
 ## Using it as a skill
 
 `SKILL.md` is written in the agent-skill format: when it applies, the order to
-integrate a new product, acceptance gates, and the five most common pitfalls.
+integrate a new product, acceptance gates, and the five most common pitfalls. Every
+path inside it is relative to the repository root.
 
-Point your agent at this directory and it will pick the skill up. Every path inside
-`SKILL.md` is relative to the repository root.
+To let an agent pick it up, place this directory in whatever skill directory your
+agent reads — the layout convention differs between agents, so follow yours rather
+than a path given here. A symlink into that directory works and avoids duplicating
+the checkout:
+
+```bash
+ln -s "$PWD" <your-agent's-skill-directory>/three-dossier
+```
+
+The agent then reads `SKILL.md` and works from `src/` directly. It does not need the
+committed artifact, and it does not need a build until it has changed something.
 
 ## Known trade-offs
 
