@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<!-- viewport-fit=cover 不是可选项：不写它，iOS 上 env(safe-area-inset-*) 恒为 0，
+     底部 dock 的 calc(x + env(...)) 等于只有 x，会直接贴在屏幕最下沿、压着 Home 手势条 -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SAMPLE · TECHNICAL DOSSIER</title>
+<link rel="stylesheet" href="./dossier.css">
+</head>
+<body>
+<canvas id="gl"></canvas>
+<svg id="leaders" xmlns="http://www.w3.org/2000/svg"></svg>
+<div id="labels"></div>
+
+<div class="layer">
+  <!-- ① 标题块 -->
+  <div class="panel" id="mast">
+    <div class="kicker"><i></i>ARCHIVE / 041</div>
+    <h1>SAMPLE</h1>
+    <div class="sub">GENERIC MECHANICAL ASSEMBLY</div>
+    <dl id="specs">
+      <dt>MODEL</dt><dd>S1-2026 / REV A</dd>
+      <dt>FORM</dt><dd>MODULAR CYLINDER</dd>
+      <dt>MASS</dt><dd>1.20 KG</dd>
+      <dt>FRAME</dt><dd>TWO-RAIL ALLOY</dd>
+      <dt>LINK</dt><dd>NO-CONTACT</dd>
+    </dl>
+    <div id="status">
+      <span class="led"></span>
+      <div><b>STAND-BY · IDLE ROTATE</b><small>POWER HOLD · NEUTRAL STABLE</small></div>
+    </div>
+  </div>
+
+  <!-- ③ 内部剖分 -->
+  <div class="panel" id="section">
+    <div class="hd"><span class="t">INTERNAL SECTION</span><span class="fill"></span><span class="n">01</span></div>
+    <div class="sec-row">
+      <svg viewBox="0 0 60 60">
+        <g fill="none" stroke="var(--ink)" stroke-width=".8">
+          <circle cx="30" cy="30" r="26"/><circle cx="30" cy="30" r="19.5" stroke-width=".5" stroke-dasharray="1 2"/>
+          <circle cx="30" cy="30" r="13"/><circle cx="30" cy="30" r="7"/><circle cx="30" cy="30" r="2.6"/>
+        </g>
+        <g stroke="#df5a1e" stroke-width=".8" fill="none">
+          <path d="M30 30 L47 13"/><path d="M30 30 L13 19"/><path d="M30 30 L16 45"/>
+          <path d="M30 30 L45 44"/>
+        </g>
+        <g fill="#1b1a18">
+          <circle cx="47" cy="13" r="1.5"/><circle cx="13" cy="19" r="1.5"/>
+          <circle cx="16" cy="45" r="1.5"/><circle cx="45" cy="44" r="1.5"/>
+          <circle cx="30" cy="30" r="1.7"/>
+        </g>
+      </svg>
+      <ul class="sec-list">
+        <li><b>01</b><span>OUTER SHELL</span></li>
+        <li><b>02</b><span>SLIDING SLEEVE</span></li>
+        <li><b>03</b><span>CORE MODULE</span></li>
+        <li><b>04</b><span>END CAP</span></li>
+        <li><b>05</b><span>PIVOT JOINT</span></li>
+      </ul>
+    </div>
+    <div class="sec-meta"><span>OD 52.0 MM</span><span>ID 24.0 MM</span></div>
+  </div>
+
+  <!-- ④ 控制簇 -->
+  <div class="panel" id="controls">
+    <div>
+      <div class="hd"><span class="t">CAMERA VIEWS</span><span class="fill"></span><span class="n">03</span></div>
+      <div class="btn-grid" id="views">
+        <button class="btn on" data-view="hero"><svg class="ic" fill="none" viewBox="0 0 16 16"><path d="M8 1.8 14 5.2v5.6L8 14.2 2 10.8V5.2z"/><path d="M2 5.2 8 8.6l6-3.4M8 8.6v5.6"/></svg><span class="tx">3/4</span><span class="k">01</span></button>
+        <button class="btn" data-view="front"><svg class="ic" fill="none" viewBox="0 0 16 16"><path d="M3.1 9.8V7.9a4.9 4.9 0 0 1 9.8 0v1.9"/><rect x="1.5" y="9.2" width="3.2" height="4.6" rx="1.3"/><rect x="11.3" y="9.2" width="3.2" height="4.6" rx="1.3"/></svg><span class="tx">PROFILE</span><span class="k">02</span></button>
+        <button class="btn" data-view="side"><svg class="ic" fill="none" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.4"/><path d="M1.6 8h12.8"/></svg><span class="tx">AXIS</span><span class="k">03</span></button>
+        <button class="btn" data-view="top"><svg class="ic" fill="none" viewBox="0 0 16 16"><rect x="3.4" y="3.4" width="9.2" height="9.2"/><circle cx="8" cy="8" r="1.2"/></svg><span class="tx">PLAN</span><span class="k">04</span></button>
+      </div>
+    </div>
+    <div>
+      <div class="hd"><span class="t">DISPLAY MODES</span><span class="fill"></span><span class="n">04</span></div>
+      <div class="btn-grid" id="modes">
+        <button class="btn on" data-mode="shaded"><svg class="ic" fill="none" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.4" fill="currentColor" stroke="none" opacity=".26"/><circle cx="8" cy="8" r="5.4"/><path d="M5.0 5.05A4.1 4.1 0 0 1 7.5 3.75"/></svg><span class="tx">SHADED</span></button>
+        <button class="btn" data-mode="clay"><svg class="ic" fill="none" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.4" stroke-dasharray="0.1 2.15"/></svg><span class="tx">CLAY</span></button>
+        <button class="btn" data-mode="xray"><svg class="ic" fill="none" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.4"/><ellipse cx="8" cy="8" rx="5.4" ry="2.1"/><path d="M8 2.6v10.8"/></svg><span class="tx">X-RAY</span></button>
+        <button class="btn on" data-mode="orbit"><svg class="ic" fill="none" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.6"/><ellipse cx="8" cy="8" rx="6.4" ry="2.6" transform="rotate(-26 8 8)"/><circle cx="13.6" cy="5.3" r=".85" fill="currentColor" stroke="none"/></svg><span class="tx">ORBIT</span></button>
+      </div>
+    </div>
+    <div>
+      <div class="hd"><span class="t">ASSEMBLY</span><span class="fill"></span><span class="n">08</span></div>
+      <div class="btn-grid">
+        <button class="btn" id="btn-explode"><svg class="ic" fill="none" viewBox="0 0 16 16"><path d="M8 7.4V2.1M6.2 3.9 8 2.1l1.8 1.8"/><path d="M6.4 9.6 2.4 13.6M2.4 10.5v3.1h3.1"/><path d="M9.6 9.6l4 4M13.6 10.5v3.1h-3.1"/></svg><span class="tx">EXPLODE</span><span class="k">09</span></button>
+        <button class="btn on" id="btn-callouts"><svg class="ic" fill="none" viewBox="0 0 16 16"><path d="M8.5 2.2h5.3v5.3l-6.3 6.3-5.3-5.3z"/><circle cx="11" cy="5" r="1.1"/></svg><span class="tx">LABELS</span><span class="k">10</span></button>
+      </div>
+    </div>
+    <div>
+      <div class="hd"><span class="t">ENVIRONMENT</span><span class="fill"></span><span class="n">11</span></div>
+      <div class="btn-grid" id="envsw">
+        <button class="btn on" data-env="paper"><svg class="ic" fill="none" viewBox="0 0 16 16"><path d="M3.4 2.4h6l3.2 3.2v8H3.4z"/><path d="M9.4 2.4v3.2h3.2"/></svg><span class="tx">PAPER</span></button>
+        <button class="btn" data-env="dark"><svg class="ic" fill="none" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.4"/><path d="M8 2.6a5.4 5.4 0 0 1 0 10.8z" fill="currentColor" stroke="none"/></svg><span class="tx">DARK FIELD</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑤⑥⑦ 底部 -->
+  <div id="bottom">
+    <div class="panel card" id="front">
+      <div class="hd"><span class="t">FRONT VIEW &amp; TELEMETRY</span><span class="fill"></span><span class="n">05</span></div>
+      <div class="fig">
+        <svg viewBox="0 0 90 54">
+          <g fill="none" stroke="var(--ink)" stroke-width=".8">
+            <ellipse cx="17" cy="32" rx="10" ry="14"/>
+            <ellipse cx="73" cy="32" rx="10" ry="14"/>
+            <path d="M17 18 C22 6 68 6 73 18"/>
+            <path d="M20 18 C25 9 65 9 70 18" stroke-width=".5"/>
+            <ellipse cx="17" cy="32" rx="4.6" ry="6.6" stroke-width=".45" stroke-dasharray="1 2"/>
+            <ellipse cx="73" cy="32" rx="4.6" ry="6.6" stroke-width=".45" stroke-dasharray="1 2"/>
+          </g>
+          <g stroke="var(--accent)" stroke-width=".5" fill="none">
+            <path d="M45 6 v42" stroke-dasharray="2 2.5"/>
+            <path d="M28 32 h34" stroke-dasharray="1.5 2.5"/>
+          </g>
+          <path d="M28 32 h34" stroke="none"/>
+        </svg>
+        <ul class="tele">
+          <li><span>LOAD</span><b>12.4 N</b></li>
+          <li><span>TORQ</span><b>3.2 N·m</b></li>
+          <li><span>RUN</span><b>&lt;0.04 %</b></li>
+          <li><span>LAT</span><b>14 ms</b></li>
+        </ul>
+      </div>
+      <div class="rule"></div>
+      <div style="display:flex;justify-content:space-between;font-size:7.5px;color:var(--faint);letter-spacing:.12em">
+        <span>X-AXIS</span><span>±0.5 MM</span><span>SYM 1.000</span>
+      </div>
+    </div>
+
+    <div class="panel card" id="env">
+      <div class="hd"><span class="t">ENVIRONMENTAL DATA &amp; OPERATION TIMELINE</span><span class="fill"></span><span class="n">06</span></div>
+      <div class="grid">
+        <div class="cell"><span>PRESS</span><b>101.3 kPa</b></div>
+        <div class="cell"><span>TEMP</span><b>23.4 °C</b></div>
+        <div class="cell"><span>HUM</span><b>41 %RH</b></div>
+        <div class="cell"><span>LINK</span><b>5.3 · STABLE</b></div>
+      </div>
+      <div id="lane">
+        <svg id="laneSvg" viewBox="0 0 600 26" preserveAspectRatio="none">
+          <g stroke="var(--line)" stroke-width="1" shape-rendering="crispEdges">
+            <path d="M0 18 H600"/>
+          </g>
+          <path id="waveA" fill="none" stroke="var(--accent)" stroke-width="1.1" d=""/>
+          <path id="waveB" fill="none" stroke="var(--mute)" stroke-width=".8" opacity=".8" d=""/>
+          <g id="ticks" stroke="var(--line)" stroke-width="1"></g>
+          <path id="head" d="M0 2 V24" stroke="var(--ink)" stroke-width="1.2"/>
+          <circle id="headDot" cx="0" cy="18" r="2.6" fill="var(--paper-2)" stroke="var(--ink)" stroke-width="1.1"/>
+        </svg>
+      </div>
+      <div id="transport">
+        <button id="play" title="播放 / 暂停（空格）">
+          <svg class="i-play" viewBox="0 0 8 8"><path d="M1 0.5 L7 4 L1 7.5 Z" fill="#fff"/></svg>
+          <svg class="i-pause" viewBox="0 0 8 8"><path d="M1 0.5 h2 v7 h-2 Z M5 0.5 h2 v7 h-2 Z" fill="#fff"/></svg>
+        </button>
+        <span id="tn">00:00 / 00:12</span>
+        <span style="color:var(--mute)">TURNTABLE</span>
+        <span id="speed"><span style="color:var(--mute)">SPEED</span><span class="v" id="spdV">0.35</span><span style="color:var(--mute)">RAD/S</span></span>
+      </div>
+    </div>
+
+    <div class="panel card" id="stack">
+      <div class="hd"><span class="t">STRUCTURAL OVERVIEW</span><span class="fill"></span><span class="n">07</span></div>
+      <div class="row" id="stackRow"></div>
+      <div class="lg"><span>LAYERS 05 / 05</span><span>THK 0.8–3.2 MM</span></div>
+      <div class="rule"></div>
+      <div style="display:flex;justify-content:space-between;font-size:7.5px;color:var(--faint);letter-spacing:.12em">
+        <span>ASSEMBLY</span><span>MODULAR</span><span>REV A</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="foot">
+  <span>SHEET 01 / 01 · SAMPLE DOSSIER</span>
+  <span>DRAG TO ORBIT · SPACE PLAY · 1–4 VIEWS · E EXPLODE · L LABELS · D DARK</span>
+  <span>2026-01-01 · REV A</span>
+</div>
+<div id="loading">LOADING ASSEMBLY</div>
+
+<script type="module" src="main.js"></script>
+</body>
+</html>

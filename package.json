@@ -1,0 +1,27 @@
+{
+  "name": "three-dossier",
+  "version": "0.1.0",
+  "description": "Single-file interactive 3D product dossier page — three.js stage, explode view, callouts, paper/dark themes, mobile layout. Builds to one self-contained HTML.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Lucas Zhuang",
+  "keywords": [
+    "three.js",
+    "webgl",
+    "product",
+    "dossier",
+    "explode-view",
+    "single-file"
+  ],
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "build:debug": "node tools/build.mjs --no-min --sourcemap --out examples/sample/dossier.dev.html",
+    "dev": "node tools/build.mjs --watch --out examples/sample/dossier.dev.html"
+  },
+  "dependencies": {
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.0"
+  }
+}

@@ -1,0 +1,310 @@
+/* ══════════════════════════════════════════════════════════════════════
+   技术档案页样式
+   构建时由 tools/build.mjs 内联进单文件产物（开发时用 <link> 直接引）。
+   ══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════
+   技术档案页（Scheme B）
+   调性参考：工程档案 / 规格表 —— 素色纸面、发丝线、安全橙、极小字距标注。
+   三件事必须干净：① 3D 只放产品，不要布景；② 纸色与画布同色，看不出边界；
+   ③ 所有面板用同一套网格与字距，宁可空不可挤。
+   ────────────────────────────────────────────────────────────────────── */
+:root{
+  --paper:#e7e5e0;
+  --paper-2:#eeece7;
+  --panel:rgba(243,241,236,.82);
+  --ink:#1b1a18;
+  --ink-2:#4b4944;
+  --mute:#8d8a83;
+  --faint:#b3afa7;
+  --line:#c3bfb7;
+  --line-2:#d8d4cc;
+  --accent:#df5a1e;
+  --accent-soft:#f2d6c6;
+  --ok:#2f7d5b;
+  --hover:#f7f5f1;
+  --pad:10px;
+}
+/* ══ 暗场主题 ══════════════════════════════════════════════════════════
+   只换「纸」和「墨」，不碰 3D。所有面板/文字/发丝线都由这套变量推导，
+   所以一处覆盖就整体翻转；画布是 clearAlpha:0，背景直接透出 body::before。
+   橙色 accent 在深底上要提亮一档（#df5a1e → #ff7a3d），否则暗到发闷。 */
+body[data-env="dark"]{
+  --paper:#0f1216;
+  --paper-2:#151a20;
+  --panel:rgba(21,26,33,.80);
+  --ink:#f2efe9;
+  --ink-2:#c4c0b8;
+  --mute:#8e8a82;
+  --faint:#5a5f66;
+  --line:#33383f;
+  --line-2:#232830;
+  --accent:#ff7a3d;
+  --accent-soft:#3b2317;
+  --ok:#48c08a;
+  --hover:#242b34;
+}
+*{box-sizing:border-box}
+/* `touch-action:none` 只写在 #gl 上是不够的：pinch 起手那两根手指只要有
+   一根落在 dock / 标注这类上层元素上，浏览器就会当**页面缩放**处理 ——
+   整页被放大、overflow:hidden 又让人退不回去。这是个全屏应用，没有滚动，
+   所以直接在根上关掉所有原生手势，把双指交给我们自己的 pointer 逻辑。
+   `overscroll-behavior:none` 顺带挡掉 iOS 的下拉橡皮筋 / 下拉刷新。 */
+html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);overflow:hidden;
+  touch-action:none;overscroll-behavior:none;-webkit-text-size-adjust:100%}
+body{
+  font:400 12px/1.35 "Helvetica Neue",Helvetica,Arial,"PingFang SC","Hiragino Sans GB",sans-serif;
+  -webkit-font-smoothing:antialiased;
+  letter-spacing:.01em;
+}
+/* 纸面：极淡斜纹 + 四角内缩刻度线，模仿档案纸张 */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    repeating-linear-gradient(0deg,rgba(120,112,100,.028) 0 1px,transparent 1px 3px),
+    radial-gradient(120% 90% at 50% 45%,rgba(255,255,255,.5) 0%,rgba(255,255,255,0) 60%),
+    linear-gradient(180deg,#e9e7e2 0%,#e6e3dd 60%,#e2dfd9 100%);
+  transition:background .5s ease;
+}
+/* 暗场底：中心留一团极淡的冷光晕，产品才有「被一束光罩住」的舞台感，
+   而不是平铺一块黑。竖纹保留但压到几乎看不见（深底上噪点会很明显）。 */
+body[data-env="dark"]::before{
+  background:
+    repeating-linear-gradient(0deg,rgba(255,255,255,.016) 0 1px,transparent 1px 3px),
+    radial-gradient(92% 74% at 50% 40%,rgba(112,146,188,.34) 0%,rgba(96,126,164,.10) 40%,rgba(96,126,164,0) 66%),
+    linear-gradient(180deg,#151b23 0%,#0f1318 58%,#07090d 100%);
+}
+#gl{position:fixed;inset:0;width:100%;height:100%;z-index:1;display:block;touch-action:none;cursor:grab}
+#gl.dragging{cursor:grabbing}
+
+/* ── 面板通用 ─────────────────────────────────────────────────────── */
+.layer{position:fixed;inset:0;z-index:3;pointer-events:none}
+.panel{position:absolute;pointer-events:auto}
+.panel .hd{
+  display:flex;align-items:center;gap:6px;
+  border-bottom:1px solid var(--line);
+  padding-bottom:5px;margin-bottom:7px;
+}
+.panel .hd .t{
+  font-size:8.5px;font-weight:600;letter-spacing:.19em;text-transform:uppercase;
+  color:var(--ink);white-space:nowrap;
+}
+.panel .hd .fill{flex:1;height:1px;background:var(--line-2)}
+.panel .hd .n{
+  font-size:8px;letter-spacing:.06em;color:var(--accent);
+  border:1px solid var(--accent);border-radius:1px;padding:0 3px 1px;line-height:1.1;
+}
+.rule{height:1px;background:var(--line);margin:6px 0}
+
+/* ── 左上：标题块 ──────────────────────────────────────────────────── */
+#mast{left:26px;top:20px;width:262px}
+#mast .kicker{
+  display:flex;align-items:center;gap:7px;
+  font-size:8.5px;letter-spacing:.22em;color:var(--accent);font-weight:600;text-transform:uppercase;
+}
+#mast .kicker i{width:14px;height:1px;background:var(--accent);display:block}
+#mast h1{
+  margin:9px 0 3px;font-size:40px;line-height:.96;font-weight:700;letter-spacing:-.015em;
+}
+#mast .sub{
+  font-size:8.5px;letter-spacing:.24em;color:var(--ink-2);text-transform:uppercase;
+  border-bottom:1px solid var(--line);padding-bottom:9px;
+}
+#specs{margin:9px 0 0;display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:9.5px}
+#specs dt{color:var(--mute);letter-spacing:.13em;text-transform:uppercase;font-size:8.5px;padding-top:1px}
+#specs dd{margin:0;color:var(--ink);font-variant-numeric:tabular-nums}
+#status{
+  margin-top:11px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:6px 0;display:flex;align-items:flex-start;gap:7px;font-size:9px;
+}
+#status .led{
+  width:6px;height:6px;margin-top:3px;background:var(--ok);
+  box-shadow:0 0 0 2px rgba(47,125,91,.16);flex:none;
+}
+#status b{font-weight:600;letter-spacing:.12em;font-size:8.5px}
+#status small{display:block;color:var(--mute);font-size:8px;letter-spacing:.1em;margin-top:2px}
+
+/* ── 上中：正交轮廓 ────────────────────────────────────────────────── */
+
+/* ── 右上：内部剖分 ────────────────────────────────────────────────── */
+#section{right:26px;top:16px;width:212px}
+.sec-row{display:flex;gap:8px;align-items:flex-start}
+.sec-row svg{width:54px;height:54px;flex:none;margin-top:2px}
+.sec-list{list-style:none;margin:0;padding:0;font-size:8.5px;letter-spacing:.09em;flex:1;white-space:nowrap}
+.sec-list li{display:flex;gap:6px;padding:1.5px 0;color:var(--ink-2)}
+.sec-list li b{color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums;min-width:14px}
+.sec-meta{display:flex;justify-content:space-between;font-size:8px;color:var(--mute);letter-spacing:.12em;margin-top:6px}
+
+/* ── 右侧：控制簇 ──────────────────────────────────────────────────── */
+#controls{right:26px;top:196px;width:212px;display:flex;flex-direction:column;gap:12px}
+.btn{
+  display:flex;align-items:center;justify-content:space-between;gap:6px;
+  font:inherit;font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-2);background:var(--panel);
+  border:1px solid var(--line);padding:5px 7px;cursor:pointer;
+  transition:background .12s,color .12s,border-color .12s;
+  text-align:left;
+}
+.btn:hover{background:var(--hover);border-color:var(--faint);color:var(--ink)}
+.btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.on .k{color:rgba(255,255,255,.75)}
+.btn .k{font-size:7.5px;letter-spacing:.08em;color:var(--faint)}
+.btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+/* 图标：统一 16 格画布、圆头描边、颜色跟文字（currentColor）。
+   stroke-width 要按缩放比反算 —— 16 格画到 12 px 是 0.75 倍，
+   写 1.1 实际只有 0.8 px，细到看不见，所以这里给 1.45。
+   fill 一律写在 SVG **属性**上（根节点 fill="none"），这里绝不写 CSS fill：
+     · 不写的话 <circle>/<rect>/<path> 默认 fill:black，图标会变成一团黑饼；
+     · 写成 CSS .ic{fill:none} 又会被子元素的 fill="currentColor" 打不过
+       （CSS 声明优先级高于 presentation attribute），DARK FIELD 的半月、SHADED 的
+       柔光内芯就都填不出来。
+     · 根节点 fill="none" 是可继承属性，子元素自己写 fill 就能局部覆盖 —— 唯一正解。 */
+.btn .ic{width:12px;height:12px;flex:none;display:block;opacity:.68;
+  stroke:currentColor;stroke-width:1.45;stroke-linecap:round;stroke-linejoin:round;
+  /* 图标不接管指针事件：命中一律落在 <button> 上，:hover 与 e.target.closest(...) 的行为
+     和加图标之前完全一致 */
+  pointer-events:none}
+.btn:hover .ic{opacity:.9}
+.btn.on .ic{opacity:.96}
+.btn .tx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── 底部三栏 ──────────────────────────────────────────────────────── */
+#bottom{position:absolute;left:26px;right:26px;bottom:18px;display:grid;
+  grid-template-columns:200px 1fr 232px;gap:14px;align-items:stretch;pointer-events:none}
+#bottom .panel{position:static;pointer-events:auto}
+.card{background:var(--panel);border:1px solid var(--line);padding:8px 9px 9px;height:100%}
+.card .hd{margin-bottom:6px}
+
+/* 前视图 + 遥测 */
+#front .fig{display:flex;gap:6px;align-items:center;margin:2px 0 6px}
+#front svg{width:74px;height:48px;flex:none}
+.tele{list-style:none;margin:0;padding:0;font-size:8.5px;letter-spacing:.1em;flex:1}
+.tele li{display:flex;justify-content:space-between;gap:6px;padding:2px 0;border-bottom:1px dotted var(--line-2);white-space:nowrap}
+.tele li:last-child{border:0}
+.tele b{font-weight:600;font-variant-numeric:tabular-nums}
+
+/* 环境数据 + 时间轴 */
+#env .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px 10px;font-size:8.5px;margin-bottom:6px}
+#env .grid .cell{display:flex;justify-content:space-between;border-bottom:1px dotted var(--line-2);padding-bottom:1px}
+#env .grid .cell span{color:var(--mute);letter-spacing:.12em;font-size:8px}
+#env .grid .cell b{font-weight:600;font-variant-numeric:tabular-nums}
+#lane{position:relative;height:26px;margin:2px 0 4px}
+#lane svg{position:absolute;inset:0;width:100%;height:100%}
+#transport{display:flex;align-items:center;gap:8px;font-size:8px;letter-spacing:.1em;color:var(--ink-2)}
+#play{
+  width:20px;height:20px;flex:none;border:1px solid var(--ink);background:var(--ink);
+  color:#fff;display:grid;place-items:center;cursor:pointer;padding:0;
+}
+#play svg{width:8px;height:8px;display:block}
+#play.paused svg.i-pause{display:none}
+#play:not(.paused) svg.i-play{display:none}
+#tn{font-variant-numeric:tabular-nums;letter-spacing:.06em}
+#speed{margin-left:auto;display:flex;align-items:center;gap:4px}
+#speed .v{border:1px solid var(--line);background:#fff0;padding:1px 4px;font-variant-numeric:tabular-nums}
+
+/* 结构总览 */
+#stack .row{display:flex;gap:3px;margin:2px 0 5px}
+#stack .cell{flex:1;text-align:center;font-size:6.5px;color:var(--mute);letter-spacing:.06em}
+#stack .cell svg{width:100%;height:26px;display:block;margin-bottom:2px}
+#stack .lg{display:flex;justify-content:space-between;font-size:7.5px;color:var(--faint);letter-spacing:.1em}
+
+/* ── 3D 标注引线 ───────────────────────────────────────────────────── */
+#leaders{position:fixed;inset:0;z-index:2;pointer-events:none;overflow:visible}
+#leaders path,#leaders circle{transition:opacity .22s linear}
+#labels{position:fixed;inset:0;z-index:4;pointer-events:none}
+.callout{position:absolute;transform:translate(0,-50%);white-space:nowrap;transition:opacity .22s linear;
+  /* 纸色描边：拆解后零件铺满画面，标签会压到深色零件上，没有这层就糊成一团 */
+  text-shadow:0 0 2px var(--paper),0 0 4px var(--paper),0 0 7px var(--paper)}
+.callout .no{font-size:7px;color:var(--accent);letter-spacing:.1em;margin-right:4px;font-weight:600}
+.callout .lb{font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink)}
+.callout .zh{display:block;font-size:8px;letter-spacing:.1em;color:var(--mute);margin-top:1px}
+.callout.left{text-align:right}
+.callout.left .zh{text-align:right}
+
+/* ── 页脚 ──────────────────────────────────────────────────────────── */
+#foot{
+  position:fixed;left:26px;right:26px;bottom:4px;z-index:3;
+  display:flex;justify-content:space-between;font-size:7.5px;letter-spacing:.16em;
+  color:var(--faint);text-transform:uppercase;pointer-events:none;
+}
+#loading{
+  position:fixed;inset:0;z-index:9;display:grid;place-items:center;background:var(--paper);
+  font-size:9px;letter-spacing:.26em;color:var(--mute);transition:opacity .4s;
+}
+#loading.gone{opacity:0;pointer-events:none}
+@media (max-width:1180px){
+  #mast{width:216px} #mast h1{font-size:32px}
+  #section,#controls{width:170px}
+  #bottom{grid-template-columns:170px 1fr 190px}
+}
+
+/* ══ 手机竖屏（由 main.js 的 resize() 打 body.m）═════════════════════════
+   窄屏塞不下「左标题 + 右控制 + 底部三栏」这套网格：控制簇会压在产品上、
+   底部三栏要横向滚出屏幕。改法是**重排而不是压缩** ——
+     · 顶部只留名字 + 三行规格（MODEL / FORM / MASS）
+     · 3D 独占中间那块空地（取景与竖直偏移由 resize() 给）
+     · 四组控制沉到底部当 dock（2×2 分组，每组 2×2 按钮）
+     · 底部三块仪表（FRONT VIEW / ENVIRONMENTAL / STRUCTURAL）整体隐藏
+   ⚠️ 只改样式，DOM 一个节点都不删：main.js 每帧还在往 #head / #headDot /
+   #tn / #waveA / #stackRow 里写东西，删了就是 null 引用。 */
+body.m #mast{left:16px;right:16px;top:12px;width:auto}
+body.m #mast .kicker{font-size:7.5px;letter-spacing:.18em}
+body.m #mast h1{font-size:26px;margin:6px 0 2px}
+body.m #mast .sub{font-size:7px;letter-spacing:.17em;padding-bottom:7px}
+body.m #specs{margin-top:7px;gap:2px 10px;font-size:8.5px}
+body.m #specs dt{font-size:7px;letter-spacing:.1em}
+/* 只留三行（dl 里每行是 dt+dd 两个节点，故从第 7 个节点起隐藏） */
+body.m #specs > *:nth-child(n+7){display:none}
+body.m #status,body.m #section{display:none}
+body.m #bottom,body.m #foot{display:none}
+
+/* 控制簇 → 底部 dock */
+/* 悬浮卡片而不是贴底通栏：底部留 8 px 安全缝，再叠 iPhone 的 safe-area inset。
+   贴底通栏只有 9 px 内边距，拇指按最下一排时几乎贴着屏幕边缘/手势条，手感很紧张。
+   浮起之后 `dock.top` 会自动上移，resize() 的取景跟着重算，JS 不用改。 */
+body.m #controls{
+  left:10px;right:10px;top:auto;width:auto;
+  bottom:calc(12px + env(safe-area-inset-bottom));
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;
+  padding:10px 11px;
+  background:var(--panel);border:1px solid var(--line);border-radius:11px;
+  box-shadow:0 6px 22px rgba(28,24,18,.13),0 1px 3px rgba(28,24,18,.07);
+  -webkit-backdrop-filter:blur(9px);backdrop-filter:blur(9px);
+}
+body.m #controls .hd{margin-bottom:4px;padding-bottom:4px;gap:5px}
+body.m #controls .hd .t{font-size:7px;letter-spacing:.12em}
+body.m #controls .hd .n{font-size:6.5px;padding:0 2px}
+/* 手机上把按钮右侧的小编号收掉：等宽轨道之后 81 px 里塞不下
+   「图标 12 + 文字 + 编号 9 + 两个 6 px 间隙」，AXIS / DARK FIELD 会被截成
+   「AXI…」。编号本来就是索引装饰，去掉它正好把宽度还给文字。
+   ⚠️ 只 hide，不删节点。 */
+/* 字号取 7.5 / letter-spacing 收到 .02em / 左右内边距 4 px —— 这三项是量出来的，不是猜的：
+   360 px 小屏上按钮只有 74 px，「DARK FIELD」在 7.8px + .05em 下要 48 px、可用 45 px 会截断；
+   降到 7.5px + .02em 后文字约 44.7 px、可用 47 px。再小就没法读了。 */
+body.m .btn{font-size:7.5px;letter-spacing:.02em;padding:8px 4px;min-height:30px;gap:5px}
+body.m .btn .k{display:none}
+body.m .btn-grid{gap:5px;grid-template-columns:repeat(2,minmax(0,1fr))}
+
+/* 标注缩一号：手机上产品只有 330 px 宽，8.5 px 的那套会盖掉小半个零件 */
+body.m .callout .no{font-size:6px;margin-right:3px}
+body.m .callout .lb{font-size:6.8px;letter-spacing:.1em}
+body.m .callout .zh{font-size:6.2px;letter-spacing:.06em;margin-top:0}
+/* 白描边加厚一档：字号小了以后，标签压在产品深色零件上更容易糊 */
+body.m .callout{text-shadow:0 0 3px var(--paper),0 0 6px var(--paper),0 0 10px var(--paper)}
+
+/* ══ 横屏手机（高 ≤520，宽度不一定窄）════════════════════════════════════
+   竖屏那套在横屏会把产品压成 120 px：标题 118 + dock 152 全高只剩 390。
+   所以横屏换一套：标题只留名字，dock 四组排成一行、按钮压薄。 */
+@media (max-height:520px){
+  body.m #mast{top:8px}
+  body.m #mast .kicker{font-size:7px}
+  body.m #mast h1{font-size:18px;margin:2px 0 0}
+  body.m #mast .sub{display:none}
+  body.m #specs{display:none}
+  body.m #controls{
+    left:8px;right:8px;bottom:calc(6px + env(safe-area-inset-bottom));
+    grid-template-columns:repeat(4,minmax(0,1fr));gap:6px 10px;
+    padding:7px 10px;border-radius:9px;
+  }
+  body.m #controls .hd{margin-bottom:3px;padding-bottom:3px}
+  body.m .btn{min-height:24px;padding:4px 6px;font-size:7.5px}
+}
