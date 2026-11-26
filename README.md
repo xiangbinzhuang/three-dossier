@@ -161,10 +161,11 @@ Two caveats:
 - **GLB / glTF is not supported.** Parsing is asynchronous, but `createRig()` must
   return synchronously. Convert the model to OBJ, or pre-convert it to OBJ at build
   time.
-- **Textures referenced by an MTL file are not inlined.** The OBJ and MTL are
-  inlined, but images referenced from the MTL would still be fetched at runtime —
-  which breaks the zero-request rule. Either bake the texture into the geometry,
-  or apply materials through the `materials` option instead.
+- **Textures are not inlined.** The OBJ itself is inlined, but an MTL file's
+  `map_Kd` points at an image that the browser would have to fetch — which breaks
+  the zero-request rule. If the OBJ has no MTL, a `usemtl` reference simply yields a
+  plain white material and no request is made. For real surfaces, pass the look
+  through the `materials` option instead.
 
 ## Why a single file
 

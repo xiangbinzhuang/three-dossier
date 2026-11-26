@@ -46,7 +46,8 @@ npm run build -- --product obj-demo --out examples/my-product/dossier.html
 
 **用模型文件（OBJ）时**：模型必须按部件分组（`o` / `g`），
 否则爆炸图没有层可拆。构建期会把模型内联进产物，运行时零网络请求 ——
-但 MTL 引用的**贴图不会被内联**，用到贴图请在 `config` 的 `materials` 里直接给材质。
+但 MTL 引用的**贴图不会被内联**（会被浏览器去 fetch），用到贴图请在 `config` 的
+`materials` 里直接给材质参数。没有 MTL 时 `usemtl` 引用只会得到白色材质，不发请求。
 
 ## 提交前的验收
 
