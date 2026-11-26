@@ -147,6 +147,15 @@ how esbuild's `$` and `$$` handling collides with jQuery-style helpers.
 
 Read it before you copy any of this code — each of those cost hours to track down.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). In short: change `src/`, never the committed
+artifact by hand, and run `npm run build` so `examples/sample/dossier.html` stays in
+sync — CI fails if it does not.
+
+Security reports go through GitHub's private advisory channel rather than a public
+issue; see [SECURITY.md](SECURITY.md).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

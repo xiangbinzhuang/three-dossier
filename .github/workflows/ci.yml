@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and verify artifact
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - run: npm ci
+
+      # The committed artifact is the contract: a fresh build must reproduce it
+      # byte for byte. If this fails, either src/ changed without a rebuild or
+      # the build is not reproducible — both are release blockers.
+      - name: Build
+        run: npm run build
+
+      - name: Verify artifact matches the committed one
+        run: |
+          if ! git diff --quiet --exit-code -- examples/sample/dossier.html; then
+            echo "::error::examples/sample/dossier.html is stale — run 'npm run build' and commit the result"
+            git --no-pager diff --stat -- examples/sample/dossier.html
+            exit 1
+          fi
+
+      - name: Verify artifact has no external references
+        run: |
+          ART=examples/sample/dossier.html
+          fail=0
+          # No CDN / remote script, stylesheet, font or image references.
+          if grep -qE '(src|href)[[:space:]]*=[[:space:]]*["'"'"']?(https?:)?//' "$ART"; then
+            echo "::error::artifact references an external resource"
+            fail=1
+          fi
+          # No @import (CSS pull-in).
+          if grep -q '@import' "$ART"; then
+            echo "::error::artifact contains a CSS @import"
+            fail=1
+          fi
+          exit $fail
+
+      - name: Verify license notices are embedded
+        run: |
+          ART=examples/sample/dossier.html
+          grep -q 'MIT License' "$ART" || { echo "::error::project MIT notice missing from artifact"; exit 1; }
+          grep -q 'three.js' "$ART" || { echo "::error::three.js license notice missing from artifact"; exit 1; }

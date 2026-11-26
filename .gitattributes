@@ -1,0 +1,14 @@
+# Normalize text files in the repository, check out with LF on every platform.
+* text=auto eol=lf
+
+# Screenshots are binary — never let git try to diff or apply text transforms.
+*.jpg binary
+*.png binary
+
+# The committed artifact is generated from src/ and minified into very long
+# lines, so a text diff is unreadable. Mark it binary, and tell GitHub not to
+# count its lines toward language stats or attribute them to the author.
+examples/sample/dossier.html binary linguist-generated=true
+
+# Lockfile is machine-generated.
+package-lock.json linguist-generated=true

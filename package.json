@@ -5,6 +5,14 @@
   "type": "module",
   "license": "MIT",
   "author": "Lucas Zhuang",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xiangbinzhuang/three-dossier.git"
+  },
+  "homepage": "https://github.com/xiangbinzhuang/three-dossier#readme",
+  "bugs": {
+    "url": "https://github.com/xiangbinzhuang/three-dossier/issues"
+  },
   "keywords": [
     "three.js",
     "webgl",
@@ -18,6 +26,16 @@
     "build:debug": "node tools/build.mjs --no-min --sourcemap --out examples/sample/dossier.dev.html",
     "dev": "node tools/build.mjs --watch --out examples/sample/dossier.dev.html"
   },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "src",
+    "tools",
+    "docs",
+    "SKILL.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "three": "0.186.1"
   },
