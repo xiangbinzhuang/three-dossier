@@ -23,6 +23,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Unit tests
+        run: npm test
+
       # The committed artifact is the contract: a fresh build must reproduce it
       # byte for byte. If this fails, either src/ changed without a rebuild or
       # the build is not reproducible — both are release blockers.

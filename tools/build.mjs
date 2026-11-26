@@ -17,11 +17,14 @@
  *   node tools/build.mjs --sourcemap     追加内联 sourcemap（调试用，产物会变大）
  *   node tools/build.mjs --watch         监听改文件重建（配合任意静态服务器预览）
  *   node tools/build.mjs --out path.html 指定输出
+ *   node tools/build.mjs --product <name> 选产品槽（默认 sample）
+ *
+ * 模型资源（.obj/.mtl/.gltf/.glb/.stl）也在构建期内联进产物，运行时零网络请求。
  */
 import { build } from 'esbuild';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { watch } from 'node:fs';
-import { dirname, resolve, join } from 'node:path';
+import { dirname, resolve, join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -32,8 +35,72 @@ const argOf = (f, d) => {
   return i >= 0 && args[i + 1] ? args[i + 1] : d;
 };
 
+/* 默认产品槽。改这一行就能换掉默认产物。
+   可用的槽见 src/products/ 下的目录。 */
+const DEFAULT_PRODUCT = 'sample';
+
+/* 产品槽的占位路径。main.js 里写的是
+   `import product from '../products/slot/config.js'`，
+   构建脚本把它重定向到 `src/products/<选中>/config.js`。
+   用重定向而不是在源码里写死产品名 ——
+   换产品不改源码，而且只有被选中的那一个产品模块进 bundle。 */
+const SLOT_SPECIFIER = '../products/slot/config.js';
+
 const MIN = !has('--no-min');
 const OUT = resolve(ROOT, argOf('--out', 'examples/sample/dossier.html'));
+const PRODUCT = argOf('--product', DEFAULT_PRODUCT);
+
+/* ── 模型资源内联 ───────────────────────────────────────────────────────
+   产品槽可以 import 一个模型文件（`import model from './model.obj'`）。产物必须
+   保持零网络请求，所以这些文件在**构建期**读进来、转成字符串常量，
+   由 three 的 loader 在运行时同步解析 —— 而不是让页面去 fetch 一个 .obj。
+
+   解析发生在运行时而不是构建期，是因为几何要经过 loader 的三角化与分组逻辑；
+   构建期只负责把字节搬进产物。OBJ/MTL 是文本，直接内联；GLB 是二进制，
+   转成 base64。 */
+const MODEL_EXT = new Set(['.obj', '.mtl', '.gltf', '.glb', '.stl', '.ply']);
+
+/** esbuild 插件：把模型文件变成「导出默认字符串」的虚拟模块。 */
+function modelAssetsPlugin() {
+  return {
+    name: 'model-assets',
+    setup(build) {
+      build.onResolve({ filter: /\.(obj|mtl|gltf|glb|stl|ply)$/ }, (args) => {
+        /* 只处理产品目录下的模型；node_modules 里的同名文件（three 自带的一些
+           .ply 测试资源）不该被劫持。 */
+        if (args.path.includes('node_modules')) return null;
+        return { path: resolve(args.resolveDir, args.path), namespace: 'model-asset' };
+      });
+
+      build.onLoad({ filter: /.*/, namespace: 'model-asset' }, async (args) => {
+        const buf = await readFile(args.path);
+        const ext = extname(args.path).toLowerCase();
+        /* GLB 是二进制，转 base64；其余是文本，直接内联。
+           文本走 JSON.stringify 转义，换行和引号都不会破坏产物。 */
+        const isBinary = ext === '.glb';
+        const payload = isBinary
+          ? `data:application/octet-stream;base64,${buf.toString('base64')}`
+          : buf.toString('utf8');
+        return {
+          contents: `export default ${JSON.stringify(payload)};`,
+          loader: 'js',
+        };
+      });
+    },
+  };
+}
+
+/** esbuild 插件：把产品槽的占位路径重定向到选中的产品目录。 */
+function productSlotPlugin(product) {
+  return {
+    name: 'product-slot',
+    setup(build) {
+      build.onResolve({ filter: /products\/slot\/config\.js$/ }, (args) => ({
+        path: resolve(ROOT, 'src/products', product, 'config.js'),
+      }));
+    },
+  };
+}
 
 /** 打包 JS（three 走 npm 依赖，esbuild 自己解析） */
 async function bundleJs() {
@@ -49,6 +116,7 @@ async function bundleJs() {
     legalComments: 'eof',
     write: false,
     logLevel: 'warning',
+    plugins: [productSlotPlugin(PRODUCT), modelAssetsPlugin()],
   });
   return res.outputFiles[0].text;
 }
@@ -124,8 +192,9 @@ await run();
 if (has('--watch')) {
   console.log('watching src/ …');
   let timer = null;
-  watch(join(ROOT, 'src'), { recursive: true }, () => {
+  const rebuild = () => {
     clearTimeout(timer);
     timer = setTimeout(() => run().catch((e) => console.error(e.message)), 120);
-  });
+  };
+  watch(join(ROOT, 'src'), { recursive: true }, rebuild);
 }

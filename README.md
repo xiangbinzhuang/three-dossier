@@ -97,6 +97,75 @@ side. It exists so the engine has something to drive: every anchor type
 something to point at. It is built from primitives only — no textures, no proprietary
 geometry, no product data. Replace the whole directory with your own.
 
+### Using an OBJ model
+
+Yes — an OBJ file works, and it is the fastest way to get a real product on the
+page. `src/products/obj-demo/` is a complete working example.
+
+Model files are **inlined into the artifact at build time**, so the output stays
+self-contained: the page still makes zero network requests and still opens from a
+`file://` path.
+
+```bash
+npm run build -- --product obj-demo      # → examples/sample/dossier.html
+npm run build -- --product obj-demo --out examples/my-product/dossier.html
+```
+
+The `--product` flag selects a slot. It rewrites one import path at build time, so
+switching products produces **no source diff** and only the selected product's code
+and geometry end up in the bundle.
+
+To use your own model, copy the demo slot:
+
+```
+src/products/obj-demo/
+  demo.obj      ← replace with your model
+  rig.js        ← points buildObjRig at the model
+  config.js     ← camera presets, callouts, explode offsets
+```
+
+`rig.js` is where the model becomes a product:
+
+```js
+import modelText from './model.obj';
+import { buildObjRig } from '../../kit/objrig.js';
+
+export function createRig() {
+  return buildObjRig(modelText, {
+    height: 2.0,                              // normalised target height
+    up: 'y',                                  // model's own up-axis
+    layers: ['housing', 'core', 'cap'],       // assemblies that may explode
+    explode: { cap: [0, 1.35, 0], housing: [0, 0.68, 0] },
+    materials: { housing: { color: 0xb9b4aa, roughness: 0.58, metalness: 0.16 } },
+  });
+}
+```
+
+`buildObjRig` handles the three things every CAD export needs:
+
+- **Normalisation** — CAD files come in millimetres, centimetres or inches. The model
+  is scaled to a fixed height and centred on the origin so the camera framing works
+  regardless of the source units.
+- **Assembly → layer mapping** — each `o` / `g` group in the OBJ becomes one
+  explode layer. The loader's group is wrapped in its own `THREE.Group` so moving a
+  layer does not disturb the mesh's local coordinates.
+- **Material unification** — OBJ carries `MeshPhongMaterial`, which has no
+  metalness or roughness, so the studio lighting flattens it. Materials are
+  converted to `MeshStandardMaterial`, and `materials` overrides them.
+
+**Your model must be split into groups.** The explosion view needs a layer per
+assembly; an OBJ with one big group can only be shown, not taken apart.
+
+Two caveats:
+
+- **GLB / glTF is not supported.** Parsing is asynchronous, but `createRig()` must
+  return synchronously. Convert the model to OBJ, or pre-convert it to OBJ at build
+  time.
+- **Textures referenced by an MTL file are not inlined.** The OBJ and MTL are
+  inlined, but images referenced from the MTL would still be fetched at runtime —
+  which breaks the zero-request rule. Either bake the texture into the geometry,
+  or apply materials through the `materials` option instead.
+
 ## Why a single file
 
 The way a dossier page gets used is "send it to someone and let them look". A version

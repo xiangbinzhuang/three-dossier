@@ -3,3 +3,7 @@ node_modules/
 *.log
 # 开发期的中间产物
 examples/*/dossier.dev.html
+# 非默认产品槽的构建产物 —— 只有 examples/sample/ 那一份进版本库，
+# 其余产品槽的产物按需本地构建，不入库
+examples/*/dossier.html
+!examples/sample/dossier.html

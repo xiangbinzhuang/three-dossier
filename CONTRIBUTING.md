@@ -7,10 +7,12 @@
 ```bash
 npm install
 npm run build
+npm test
 open examples/sample/dossier.html
 ```
 
 Node ≥ 18。构建只依赖 `three` 与 `esbuild`，产物本身零运行时依赖。
+测试用 Node 内置的 test runner，不需要装任何东西。
 
 ## 分支与提交
 
@@ -32,9 +34,24 @@ src/app/                装配。main.js 接线 + index.html 骨架 + dossier.cs
 
 产品层的完整字段说明在 [docs/契约.md](docs/契约.md)，接第一个产品前先读那一页。
 
+**产品槽用构建参数选，不改源码。** `main.js` 里写的是占位路径
+`../products/slot/config.js`，构建时重定向到选中的槽：
+
+```bash
+npm run build -- --product obj-demo
+npm run build -- --product obj-demo --out examples/my-product/dossier.html
+```
+
+新增产品只要建 `src/products/<name>/` 目录，不用改 `main.js`、不用登记。
+
+**用模型文件（OBJ）时**：模型必须按部件分组（`o` / `g`），
+否则爆炸图没有层可拆。构建期会把模型内联进产物，运行时零网络请求 ——
+但 MTL 引用的**贴图不会被内联**，用到贴图请在 `config` 的 `materials` 里直接给材质。
+
 ## 提交前的验收
 
 ```bash
+npm test
 npm run build
 ```
 

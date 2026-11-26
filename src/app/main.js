@@ -5,6 +5,9 @@
    把 DOM 按钮连到 kit 的 setter 上。
 
    换产品 = 换掉 src/products/<name>/ 那一层（config.js + rig.js），本文件不动。
+
+   想换产品时改下面这一行（也可以用 `npm run build -- --product <name>`，
+   见 README「Swap in your own product」）：
    ────────────────────────────────────────────────────────────────────── */
 import * as THREE from 'three';
 import { one, all, clamp } from '../kit/util.js';
@@ -17,7 +20,22 @@ import { createTheme } from '../kit/theme.js';
 import { createCallouts } from '../kit/callouts.js';
 import { createHud } from '../kit/hud.js';
 import { createLoop } from '../kit/loop.js';
-import product from '../products/sample/config.js';
+
+/* 产品槽。构建期由 tools/build.mjs 的 --product 选项决定（见 build.mjs）。
+   下面这行 import 里的 `slot` 是**占位路径** —— 构建脚本会把它重定向到
+   实际选中的产品目录（src/products/<name>/config.js）。
+
+   为什么用重定向而不是在代码里写死：
+     · 换产品不改源码 —— git diff 里不会出现与产品无关的改动
+     · 只有被选中的那一个产品模块进 bundle —— 别的产品的模型文件整块丢掉，
+       产物不会因为「多了一个产品槽」而白白变大
+   换产品的三种方式：
+     npm run build -- --product obj-demo
+     npm run build -- --product obj-demo --out examples/obj-demo/dossier.html
+     改 tools/build.mjs 里的 DEFAULT_PRODUCT */
+import product from '../products/slot/config.js';
+
+const productCfg = product;
 
 /* ── DOM ─────────────────────────────────────────────────────────────── */
 const dom = {
@@ -60,7 +78,7 @@ const isNarrow = () => window.innerWidth < 760 || window.innerHeight < 520;
    顺序有讲究：产品 rig 建纹理时要问 renderer 的最大各向异性，而舞台建地面要
    产品的包围盒。所以 renderer 单独先建，产品随后，舞台最后。 */
 const renderer = createRenderer(dom.canvas);
-const rig = product.createRig({ renderer });
+const rig = productCfg.createRig({ renderer });
 const B = rig.bounds;
 
 const stage = createStage({ renderer, bounds: B });
@@ -73,7 +91,7 @@ stage.spin.add(rig.root);
 
 /* ── kit 实例 ────────────────────────────────────────────────────────── */
 const look = createLook({ root: rig.root });
-const framing = createFraming({ bounds: B, camera: stage.camera, layout, cfg: product.framing });
+const framing = createFraming({ bounds: B, camera: stage.camera, layout, cfg: productCfg.framing });
 
 /* orbit 与 explode 互相引用（缩放上限要看拆解进度、拆解要改相机目标），
    用一个延后的 getter 打破循环。 */
@@ -82,7 +100,7 @@ const orbit = createOrbit({
   camera: stage.camera,
   canvas: dom.canvas,
   framing,
-  presets: product.views,
+  presets: productCfg.views,
   onFreeze: () => {
     rt.orbit = false;
     dom.modes.querySelector('[data-mode="orbit"]')?.classList.remove('on');
@@ -94,7 +112,7 @@ ex = createExplode({
   product: rig,
   framing,
   orbit,
-  cfg: product.explode,
+  cfg: productCfg.explode,
   getSpinA: () => rt.spinA,
   onState: (on) => {
     rt.explode = on;
@@ -120,21 +138,21 @@ const callouts = createCallouts({
   spin: stage.spin,
   camera: stage.camera,
   layout,
-  cfg: product.callouts,
+  cfg: productCfg.callouts,
   dom: { labelHost: dom.labels, leaderSvg: dom.leaders },
   getSpinA: () => rt.spinA,
   getExK: () => ex.k,
   getKind: () => theme.kind,
 });
 
-const hud = createHud({ cfg: product.hud, dom });
+const hud = createHud({ cfg: productCfg.hud, dom });
 
 /* 产品专属运行时（面罩波纹这类）。返回 { tick(dt) }，可以不实现。 */
-const extra = product.init?.({ product: rig, stage, THREE });
+const extra = productCfg.init?.({ product: rig, stage, THREE });
 
 const loop = createLoop({
   stage, orbit, explode: ex, callouts, hud,
-  clock: product.clock,
+  clock: productCfg.clock,
   runtime: rt,
   onTick: (dt) => extra?.tick?.(dt),
 });
@@ -292,7 +310,7 @@ const QA = {
   },
   get exK() { return ex.k; },
   setView: (name) => {
-    const p = product.views[name];
+    const p = productCfg.views[name];
     if (!p) return;
     orbit.jumpTo(p.yaw, p.pitch, rt.spinA);
     rt.orbit = false;
@@ -303,5 +321,5 @@ const QA = {
   product: rig, anchors: callouts.anchors, camDir: callouts.camDir,
   layout, orbit, explode: ex, theme, look, hud,
 };
-window[product.qaGlobal || 'DOSSIER'] = QA;
+window[productCfg.qaGlobal || 'DOSSIER'] = QA;
 window.DOSSIER = QA;

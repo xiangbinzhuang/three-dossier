@@ -34,13 +34,30 @@ src/app/                装配。main.js 接线 + index.html 骨架 + dossier.cs
 
 ## §2 接一个新产品的顺序
 
+**路线 A：代码搭几何**（和产品无关时）
+
 1. `cp -r src/products/sample src/products/<name>`
 2. `rig.js`：`createRig()` 返回 `{ root, bounds, parts, joints, mat }`。
    `bounds` 要**量出来**（`new THREE.Box3().setFromObject(root)`），不是估的。
 3. `config.js`：`views` 四档机位、`callouts` 五条（先少写几条跑通再加）、
    `explode.slideOffsets`、`hud.layers`。
-4. 改 `src/app/main.js` 的 import 那一行。
-5. `npm run build`，双击产物，逐个按钮点一遍。
+4. `npm run build -- --product <name>`，双击产物，逐个按钮点一遍。
+
+**路线 B：拿模型文件**（有 CAD / 3D 导出时，推荐）
+
+1. `cp -r src/products/obj-demo src/products/<name>`，把模型换成自己的
+2. `rig.js` 里改 `buildObjRig(modelText, {...})` 的参数：
+   `layers`（哪些 `o`/`g` 分组参与拆解）、`explode`（每层往哪推多远）、
+   `materials`（颜色/粗糙度/金属度）、`height`（归一化目标高度）、`up`（模型的上轴）
+3. `config.js` 按模型改 `callouts` 的 `anchor.name`（要用模型里的分组名）和 `views`
+4. `npm run build -- --product <name>`，双击产物，逐个按钮点一遍
+
+**两条路线都不用改 `src/app/main.js`** —— 它里面写的是占位路径
+`../products/slot/config.js`，构建时重定向到选中的槽。改源码会产生与产品
+无关的 diff，而且未选中的产品模块进不了 bundle（产物白白变大）。
+
+模型文件在**构建期内联**进产物，运行时零网络请求。但 MTL 引用的**贴图不会内联** ——
+用到贴图就在 `materials` 里直接给材质参数。
 
 `index.html` 里的文案（型号、规格、面板标题）是设计出来的版式，逐字改那一段 HTML。
 不要把文案搬进 config 用 JS 拼字符串。
