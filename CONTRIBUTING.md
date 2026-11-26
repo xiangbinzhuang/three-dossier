@@ -49,6 +49,17 @@ npm run build -- --product obj-demo --out examples/my-product/dossier.html
 但 MTL 引用的**贴图不会被内联**（会被浏览器去 fetch），用到贴图请在 `config` 的
 `materials` 里直接给材质参数。没有 MTL 时 `usemtl` 引用只会得到白色材质，不发请求。
 
+新槽用生成器起手，别手抄：
+
+```bash
+npm run make-slot -- path/to/model.obj slot-name
+npm run build -- --product slot-name --out examples/slot-name/dossier.html
+```
+
+生成器会算好拆解方向、行程和标注锚点，你只改配色和文案。
+手写也行 —— `src/products/obj-demo/` 就是手写的例子，但注意标注是按
+**模型的分组名**索引的，分组名对不上时标注会**静默消失**（不报错、只是看不见）。
+
 ## 提交前的验收
 
 ```bash

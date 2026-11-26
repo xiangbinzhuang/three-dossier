@@ -12,3 +12,4 @@
  * import 的副作用就是执行 —— `node:test` 会自动注册并运行它们。
  */
 import './objrig.test.js';
+import './make-slot.test.js';

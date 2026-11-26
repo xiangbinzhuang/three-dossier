@@ -34,6 +34,14 @@ src/app/                装配。main.js 接线 + index.html 骨架 + dossier.cs
 
 ## §2 接一个新产品的顺序
 
+**先装依赖**（干净 clone 下来没有 `node_modules`，跳过后面的命令全都跑不起来）：
+
+```bash
+npm install
+```
+
+之后每一步都在这个仓库根目录执行。
+
 **路线 A：代码搭几何**（和产品无关时）
 
 1. `cp -r src/products/sample src/products/<name>`
@@ -45,10 +53,28 @@ src/app/                装配。main.js 接线 + index.html 骨架 + dossier.cs
 
 **路线 B：拿模型文件**（有 CAD / 3D 导出时，推荐）
 
+```bash
+# 生成槽（会自动算好拆解方向、行程、标注锚点）
+npm run make-slot -- path/to/model.obj <name>
+# 改 src/products/<name>/rig.js 里的 materials（配色）
+# 改 src/products/<name>/config.js 里的 callouts 文案
+npm run build -- --product <name> --out examples/<name>/dossier.html
+```
+
+生成器输出 `src/products/<name>/`（模型 + rig.js + config.js），
+你只需要改配色和文案。
+
+**别忘了 `src/app/index.html`**。生成器只写产品槽，不碰装配层的文案 ——
+型号、规格、面板标题、「SAMPLE」这个刊头全在那里。不改成自己的，页面
+标题就还是 `SAMPLE`，模型再好也像没做完。这是最容易漏的一步。
+
+**手写也行** —— `src/products/obj-demo/` 是手写例子：
+
 1. `cp -r src/products/obj-demo src/products/<name>`，把模型换成自己的
 2. `rig.js` 里改 `buildObjRig(modelText, {...})` 的参数：
    `layers`（哪些 `o`/`g` 分组参与拆解）、`explode`（每层往哪推多远）、
-   `materials`（颜色/粗糙度/金属度）、`height`（归一化目标高度）、`up`（模型的上轴）
+   `materials`（颜色/粗糙度/金属度）、`size`（归一化后的最长边目标长度）、
+   `up`（模型的上轴）
 3. `config.js` 按模型改 `callouts` 的 `anchor.name`（要用模型里的分组名）和 `views`
 4. `npm run build -- --product <name>`，双击产物，逐个按钮点一遍
 
@@ -58,6 +84,16 @@ src/app/                装配。main.js 接线 + index.html 骨架 + dossier.cs
 
 模型文件在**构建期内联**进产物，运行时零网络请求。但 MTL 引用的**贴图不会内联** ——
 用到贴图就在 `materials` 里直接给材质参数。
+
+**两个坑**：
+
+1. **模型必须按部件分组**（`o` / `g`），否则爆炸图没有层可拆。
+2. **标注按分组名索引** —— 分组名对不上，标注会**静默消失**（不报错、只是看不见）。
+   用生成器能避开。
+
+**另一个坑**：归一化只能烘焙进 geometry，不能动 `root` 的 position / scale。
+app 层要按 bounds 居中、拆解位移是世界单位，两处都碰 root 会打架 ——
+模型会撑出画面。`buildObjRig` 已经处理好了，别自己再挪 root。
 
 `index.html` 里的文案（型号、规格、面板标题）是设计出来的版式，逐字改那一段 HTML。
 不要把文案搬进 config 用 JS 拼字符串。
@@ -79,7 +115,26 @@ pg.screenshot(...)
 判据：改动前后同状态截图的 **平均绝对误差 ≤ 1.0**（抗锯齿和贴图动画的噪声级别）。
 > 3 就是画面真的变了。
 
-必须过的五态：`hero / clay / xray / dark / explode`。
+必须过的五态 —— 注意这五态分属**四条独立的轴**，不是一套互斥的模式：
+
+| 轴 | 钩子 | 取值 |
+|---|---|---|
+| 显示模式 | `setMode(m)` | `shaded` / `clay` / `xray` |
+| 环境 | `setEnv(k)` | `paper` / `dark` |
+| 机位 | `setView(name)` | `hero` / `front` / `side` / `top` |
+| 拆解、标注 | `setExplode(b)` / `setLabels(b)` | 布尔 |
+
+所以截图组合是 `setView('hero')`、`setMode('clay')`、`setMode('xray')`、
+`setEnv('dark')`、`setExplode(true)`。
+
+⚠️ 这四条轴**互不校验**，传错值不报错也不生效：
+
+- `setMode('explode')` 静默无操作 —— 截出来的图和 `shaded` 一模一样。
+- `setMode('hero')`、`setMode('dark')` 同理，都是无效值。
+
+把「图没变化」先怀疑成渲染 bug 之前，先确认每个钩子收到的是自己那条轴的值。
+`setMode()` 只认三个值，实现在 `src/kit/look.js`；四个轴可以叠加，
+暗场 + 拆解 + X 光是成立的组合。
 再加手机四档：`360×780 / 390×844 / 430×932 / 844×390`，每档看三条：
 
 - `document.documentElement.scrollWidth === window.innerWidth`（无横向溢出）

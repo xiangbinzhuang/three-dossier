@@ -75,18 +75,25 @@ Three things change when you add a product:
 2. `rig.js` — `createRig()` returns `{ root, bounds, parts, joints, mat }`
 3. `config.js` — camera presets, callout anchors, explode offsets, HUD layer names
 
-Then point the import in `src/app/main.js` at your product:
+Then build it, passing the slot name:
 
-```js
-import product from '../products/<your-product>/config.js';
+```bash
+npm run build -- --product <your-product>
 ```
+
+**Do not edit the import in `src/app/main.js`.** That file imports the placeholder
+path `../products/slot/config.js`, which does not exist in the source tree — the
+build rewrites it to whichever slot you pass with `--product`. Because of that,
+only the selected product is bundled; the others never reach the artifact.
 
 The kit does not change. The full field-by-field contract is in
 [docs/契约.md](docs/契约.md) — read that page first.
 
 Copy (model numbers, specifications, panel headings) lives in `index.html`, not in
 `config.js`. That copy is a designed layout; it does not belong in strings assembled
-by JavaScript.
+by JavaScript. **A new slot does not change it** — until you edit `index.html`, your
+page still says `SAMPLE` in the masthead, however good the model looks. This is the
+step people miss most often.
 
 ### The bundled product is a placeholder
 
@@ -100,41 +107,77 @@ geometry, no product data. Replace the whole directory with your own.
 ### Using an OBJ model
 
 Yes — an OBJ file works, and it is the fastest way to get a real product on the
-page. `src/products/obj-demo/` is a complete working example.
+page. Model files are **inlined into the artifact at build time**, so the output
+stays self-contained: the page still makes zero network requests and still opens
+from a `file://` path.
 
-Model files are **inlined into the artifact at build time**, so the output stays
-self-contained: the page still makes zero network requests and still opens from a
-`file://` path.
+#### The short version
 
 ```bash
-npm run build -- --product obj-demo      # → examples/sample/dossier.html
-npm run build -- --product obj-demo --out examples/my-product/dossier.html
+# 1. 生成产品槽（把你的 OBJ 指给它）
+npm run make-slot -- ~/Desktop/my-part.obj my-part
+
+# 2. 构建预览
+npm run build -- --product my-part --out examples/my-part/dossier.html
+open examples/my-part/dossier.html
 ```
 
-The `--product` flag selects a slot. It rewrites one import path at build time, so
-switching products produces **no source diff** and only the selected product's code
-and geometry end up in the bundle.
-
-To use your own model, copy the demo slot:
+That is it. The generator reads your OBJ, works out which groups can be pulled
+apart, and writes a ready-to-build slot:
 
 ```
-src/products/obj-demo/
-  demo.obj      ← replace with your model
-  rig.js        ← points buildObjRig at the model
-  config.js     ← camera presets, callouts, explode offsets
+src/products/my-part/
+  my-part.obj   ← 你的模型（自动拷进来）
+  rig.js        ← 几何装配：哪些层可拆、各往哪推
+  config.js     ← 行为数据：机位、标注、拆解行程
 ```
 
-`rig.js` is where the model becomes a product:
+Then you edit two things: the colours in `rig.js`, and the label copy in
+`config.js`. The generator fills them with placeholders.
+
+#### What the generator works out for you
+
+- **Which groups are assemblies** — each `o` / `g` group in the OBJ is one part.
+- **Which one is the body** — the group closest to the model's centre stays put.
+  In an explosion view the body drifting off is unreadable.
+- **Which way each part pulls out** — a part offset from the centre slides along
+  that direction; parts sharing a centre are stacked along the model's longest
+  axis instead.
+- **How far** — from the model's overall size, so the framing room matches.
+- **Where the callouts go** — one per layer, anchored to it, so they follow the
+  part when it moves.
+
+The generator prints what it decided, and the values are all editable afterwards.
+
+#### Your model must be split into groups
+
+The explosion view needs a layer per assembly. An OBJ with one big group can be
+shown but not taken apart. In your CAD tool, name the groups and export:
+
+```
+o housing
+v ...
+f ...
+o core
+v ...
+f ...
+```
+
+#### Writing the slot by hand instead
+
+The generator is a convenience. `src/products/obj-demo/` is a hand-written slot,
+and this is the whole of it:
 
 ```js
-import modelText from './model.obj';
+import modelText from './demo.obj';
 import { buildObjRig } from '../../kit/objrig.js';
 
 export function createRig() {
   return buildObjRig(modelText, {
-    height: 2.0,                              // normalised target height
-    up: 'y',                                  // model's own up-axis
-    layers: ['housing', 'core', 'cap'],       // assemblies that may explode
+    size: 2.0,                               // longest edge, in world units
+    fit: 'longest',                          // or 'height'
+    up: 'y',                                 // the model's own up-axis
+    layers: ['housing', 'core', 'cap'],      // assemblies that may explode
     explode: { cap: [0, 1.35, 0], housing: [0, 0.68, 0] },
     materials: { housing: { color: 0xb9b4aa, roughness: 0.58, metalness: 0.16 } },
   });
@@ -143,18 +186,17 @@ export function createRig() {
 
 `buildObjRig` handles the three things every CAD export needs:
 
-- **Normalisation** — CAD files come in millimetres, centimetres or inches. The model
-  is scaled to a fixed height and centred on the origin so the camera framing works
-  regardless of the source units.
+- **Normalisation** — CAD files come in millimetres, centimetres or inches. The
+  model is scaled to a fixed size and centred on the origin so the camera framing
+  works regardless of the source units. The transform is baked into the geometry,
+  so the root keeps `position = 0` and `scale = 1` — the app layer centres the
+  product, and explode offsets stay in world units.
 - **Assembly → layer mapping** — each `o` / `g` group in the OBJ becomes one
   explode layer. The loader's group is wrapped in its own `THREE.Group` so moving a
   layer does not disturb the mesh's local coordinates.
 - **Material unification** — OBJ carries `MeshPhongMaterial`, which has no
   metalness or roughness, so the studio lighting flattens it. Materials are
   converted to `MeshStandardMaterial`, and `materials` overrides them.
-
-**Your model must be split into groups.** The explosion view needs a layer per
-assembly; an OBJ with one big group can only be shown, not taken apart.
 
 Two caveats:
 
