@@ -4,15 +4,6 @@
   "description": "Single-file interactive 3D product dossier page — three.js stage, explode view, callouts, paper/dark themes, mobile layout. Builds to one self-contained HTML.",
   "type": "module",
   "license": "MIT",
-  "author": "Lucas Zhuang",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/xiangbinzhuang/three-dossier.git"
-  },
-  "homepage": "https://github.com/xiangbinzhuang/three-dossier#readme",
-  "bugs": {
-    "url": "https://github.com/xiangbinzhuang/three-dossier/issues"
-  },
   "keywords": [
     "three.js",
     "webgl",

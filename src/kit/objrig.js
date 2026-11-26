@@ -45,50 +45,87 @@ function parseModel(data, format = 'obj') {
 }
 
 /**
- * 把模型摆正并缩放到目标尺寸。
+ * 计算把模型归一化到目标尺寸所需的变换。
  *
- * 归一化分三步，顺序不能换：
- *   ① 绕 X 轴转 −90°（默认 up = 'z' 时）把模型的 z 轴换成世界 y 轴
- *   ② 平移使包围盒中心落在原点
- *   ③ 均匀缩放到目标高度
+ * 返回的是一个**统一变换**（rotate → scale → translate），由调用方逐个装配地
+ * 烘焙进 geometry。这样做的理由是 kit 的两条硬约束：
  *
- * 先摆正再量包围盒，否则量的是旋转前的盒子，中心对不准。
+ *   ① `root.position` 必须是 0。app 层（main.js）会按 bounds 把产品
+ *      居中到转台中心：`root.position.y = -(top + bottom) / 2`。
+ *      若这里也平移 root，两处互相覆盖 —— 内容实际落在 root 局部坐标的
+ *      [0, h] 而不是 [-h/2, h/2]，与 bounds 差整整一个高度，
+ *      取景按 bounds 算，模型就撑出画面。
+ *   ② `root.scale` 必须是 1。拆解位移 `off` 是**世界单位**（`config.framing.maxPush`
+ *      按它来预留取景行程）。层若挂在带缩放的祖先下，平移量会被缩放，
+ *      `maxPush` 与实际位移对不上。
  *
- * ⚠️ 必须在**装配结构搭好之后**对最终 root 调用。归一化写的是 root 的
- * position / scale —— 如果先在一个临时的 wrapper 上做，再把 wrapper 的子节点
- * 重新挂到别的 group 里，wrapper 会被移出场景树，缩放和位移就全丢了
- * （表现为模型没被缩放，取景算出来的相机距离不对）。
+ * 于是缩放不能靠 Group 的 scale 实现 —— 只能烘焙进 geometry。
+ * 逐个装配用**同一个**变换，装配之间的相对位置就保住了。
+ *
+ * OBJLoader 给的 mesh 原点都是零、绝对坐标写在 geometry 里，
+ * 所以「绕 mesh 原点变换」等于「绕模型原点变换」—— 逐装配烘焙是安全的。
+ *
+ * 尺寸语义：`size` 是**最长边**的目标长度，不是高度。
+ * 取景是按包围盒算的 —— 一个又宽又扁的产品若按高度归一化，
+ * 宽度会远超取景框，模型照样出画。按最长边归一化才保证装得下。
+ * 想要「高度固定」时传 `fit: 'height'`。
  */
-function normalize(root, { height = 2.0, up = 'y' } = {}) {
-  if (up === 'z') {
-    root.rotation.x = -Math.PI / 2;
-    root.updateMatrixWorld(true);
+function normalizeTransform(src, { size: targetSize = 2.0, up = 'y', fit = 'longest' } = {}) {
+  const rotation = up === 'z' ? -Math.PI / 2 : 0;
+
+  /* 旋转后的包围盒：先把 src 整体转一下量。 */
+  let probe = src;
+  if (rotation) {
+    probe = new THREE.Group();
+    probe.add(src);
+    probe.rotation.x = rotation;
   }
-  root.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(root);
-  const size = box.getSize(new THREE.Vector3());
+  probe.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(probe);
+  const dims = box.getSize(new THREE.Vector3());
+
+  /* 缩放依据：最长边，或高度。
+     取「装得下」而不是「看起来大」—— 出画的模型再漂亮也没用。 */
+  const basis = fit === 'height'
+    ? (dims.y || 1)
+    : Math.max(dims.x, dims.y, dims.z) || 1;
+  const s = targetSize / basis;
+
+  /* 缩放后的中心（世界坐标）。
+     先缩放再量中心 —— 若先量再缩放，平移量会被一起放大，
+     中心就偏了 s − 1 倍（s=2 时偏一半高度）。 */
   const center = box.getCenter(new THREE.Vector3());
+  const scaledCenter = center.clone().multiplyScalar(s);
 
-  const tallest = Math.max(size.y, size.x, size.z) || 1;
-  const s = height / tallest;
+  return {
+    scale: s,
+    rotation,
+    translate: scaledCenter.negate(),
+    size: dims.clone().multiplyScalar(s),
+  };
+}
 
-  /* 顺序：先缩放，再平移。
-     缩放是**绕 root 原点**做的，所以缩放后包围盒中心也跟着放大。
-     若先平移再缩放，平移量会被一起放大，中心就偏了 s − 1 倍
-     （s=2 时偏一半高度 —— 模型在取景里明显偏上或偏下）。
-     先缩放后平移，平移量是缩放后世界坐标里的量，一次到位。 */
-  root.scale.setScalar(s);
-  root.updateMatrixWorld(true);
-
-  const box2 = new THREE.Box3().setFromObject(root);
-  const center2 = box2.getCenter(new THREE.Vector3());
-  root.position.x -= center2.x;
-  root.position.y -= center2.y;
-  root.position.z -= center2.z;
-  root.updateMatrixWorld(true);
-
-  const box3 = new THREE.Box3().setFromObject(root);
-  return { box: box3, size: box3.getSize(new THREE.Vector3()), scale: s };
+/**
+ * 把归一化变换烘焙进一个装配的所有 geometry。
+ *
+ * geometry.scale() 是均匀缩放，法线方向不受影响（法线只管方向，
+ * 均匀缩放不改变方向），所以不用重算法线。
+ * 旋转则必须同时作用于顶点与法线，否则 up='z' 的模型法线还指着旧方向，
+ * 光照会算错。
+ */
+function applyTransform(assembly, t) {
+  assembly.obj.traverse((o) => {
+    if (!o.isMesh) return;
+    const g = o.geometry;
+    if (t.rotation) {
+      g.rotateX(t.rotation);
+      if (g.attributes.normal) g.rotateX(t.rotation);
+    }
+    g.scale(t.scale, t.scale, t.scale);
+    g.translate(t.translate.x, t.translate.y, t.translate.z);
+    g.computeBoundingBox();
+    g.computeBoundingSphere();
+  });
 }
 
 /**
@@ -121,17 +158,19 @@ function toStandard(material, fallback) {
  *
  * @param {string|ArrayBuffer} data    模型内容（构建期内联的字符串）
  * @param {object} opts
- * @param {number} [opts.height=2.0]   归一化后的目标高度
- * @param {'y'|'z'} [opts.up='y']      模型原本的「上」方向
- * @param {string[]} [opts.layers]     参与拆解的装配名（按拆解顺序）
- * @param {object} [opts.explode]      每个层的拆解位移 `{ 层名: [x,y,z] }`
- * @param {object} [opts.materials]    材质覆写 `{ 层名: {color, roughness, metalness} }`
+ * @param {number} [opts.size=2.0]      归一化后的最长边目标长度（世界单位）
+ * @param {'longest'|'height'} [opts.fit='longest']  按哪条边归一化
+ * @param {'y'|'z'} [opts.up='y']       模型原本的「上」方向
+ * @param {string[]} [opts.layers]      参与拆解的装配名（按拆解顺序）
+ * @param {object} [opts.explode]       每个层的拆解位移 `{ 层名: [x,y,z] }`
+ * @param {object} [opts.materials]     材质覆写 `{ 层名: {color, roughness, metalness} }`
  * @param {string} [opts.format='obj']
  * @returns {{root, bounds, parts, joints, mat}}
  */
 export function buildObjRig(data, opts = {}) {
   const {
-    height = 2.0,
+    size: targetSize = 2.0,
+    fit = 'longest',
     up = 'y',
     layers = null,
     explode = {},
@@ -173,43 +212,46 @@ export function buildObjRig(data, opts = {}) {
     assemblies.push({ name, obj: child });
   });
 
+  /* ── 归一化：先量，后搬 ─────────────────────────────────────────────
+     顺序不能反：量包围盒需要所有装配都还在 src 里。一旦把装配挂到
+     layer / root 下，src 就空了，量出来的是零尺寸。
+     所以先算变换，再重挂，最后把变换烘焙进去。 */
+  const t = normalizeTransform(src, { size: targetSize, up, fit });
+
   /* ── 拆解层 ─────────────────────────────────────────────────────────
      只有 layers 里点名的装配才是可动层。没给 layers 就全部当可动层 ——
      一个整体模型拆不开，不如让调用方自己决定。 */
   const wanted = layers ?? assemblies.map((a) => a.name);
   const parts = [];
 
-  for (const name of wanted) {
-    const found = assemblies.find((a) => a.name === name);
-    if (!found) continue;
+  for (const { name, obj } of assemblies) {
+    if (!wanted.includes(name)) {
+      /* 不参与拆解的装配直接挂 root。 */
+      root.add(obj);
+      continue;
+    }
 
     /* kit 的约定：每个可动层是一个 Group，mesh 装在里面，Group 整体平移。
        所以要把 loader 给的装配**再包一层** —— 直接拿 loader 的 group 当层，
        平移它会连带改动它的局部坐标，锚点位置就全错了。 */
     const layer = new THREE.Group();
     layer.name = name;
+    layer.add(obj);
     root.add(layer);
-    layer.add(found.obj);
 
     const off = explode[name] ?? [0, 0, 0];
     parts.push({ name, g: layer, off: new THREE.Vector3(...off) });
   }
 
-  /* 不参与拆解的装配直接挂 root。 */
-  for (const a of assemblies) {
-    if (wanted.includes(a.name)) continue;
-    root.add(a.obj);
-  }
-
-  /* ── 归一化 ─────────────────────────────────────────────────────────
-     必须放在结构搭好之后：归一化改的是 root 的 position / scale，
-     而拆解层是从 root 里「搬」装配出来的 —— 先归一化再搬，
-     被搬走的装配就脱离了被缩放的 root，缩放会丢。 */
-  const norm = normalize(root, { height, up });
+  /* 逐个装配烘焙**同一个**变换（见 normalizeTransform 的说明）。
+     root 的 position / scale 保持不动 —— app 层负责居中，拆解位移是世界单位。 */
+  for (const a of assemblies) applyTransform(a, t);
 
   /* ── 包围盒 ─────────────────────────────────────────────────────────
      kit 要的是「世界坐标里的竖直极值」和「横向半宽」，用来算地面高度与
-     取景距离。这里量的是归一化之后的整机。 */
+     取景距离。这里量的是归一化之后的整机。
+     注意：root 此刻还没有被 app 层居中，量到的就是它自己的局部坐标 ——
+     与 app 层将要施加的居中无关，两者必须自洽。 */
   root.updateWorldMatrix(true, true);
   const box = new THREE.Box3().setFromObject(root);
   const bounds = {
@@ -225,6 +267,6 @@ export function buildObjRig(data, opts = {}) {
     joints: [],          // OBJ 没有「对称小件」的概念，用 kind:'part' 即可
     bounds,
     /* 附带的元信息，方便调用方写 config */
-    meta: { assemblies: assemblies.map((a) => a.name), scale: norm.scale, size: norm.size },
+    meta: { assemblies: assemblies.map((a) => a.name), scale: t.scale, size: t.size },
   };
 }

@@ -23,9 +23,11 @@ import { buildObjRig } from '../../kit/objrig.js';
  */
 export function createRig() {
   return buildObjRig(modelText, {
-    /* 归一化后的目标高度。CAD 导出的 OBJ 单位不统一，这里统一到 2 个世界单位，
-       kit 的取景参数是按这个尺度调过的。 */
-    height: 2.0,
+    /* 归一化后的最长边目标长度（世界单位）。CAD 导出的 OBJ 单位不统一，
+       这里统一到这个尺度 —— kit 的取景参数是按这个量级调过的。
+       默认按**最长边**归一化：取景是按包围盒算的，按高度归一化的话，
+       一个又宽又扁的产品会横向出画。 */
+    size: 2.0,
     up: 'y',
 
     /* 参与拆解的层，顺序决定 config.explode 里的位移方向。
